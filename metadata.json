@@ -1,0 +1,6 @@
+{
+  "name": "Evonith CCI",
+  "description": "Sinter Plant Coke Crushing Index (CCI) management app with sieve analysis, crusher line changeovers, maintenance logs, and daily WhatsApp reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

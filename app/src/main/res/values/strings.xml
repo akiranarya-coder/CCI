@@ -1,0 +1,51 @@
+<resources>
+    <string name="app_name">Evonith CCI</string>
+    <string name="company_default">Evonith Steel</string>
+    <string name="department_default">Sinter Plant — Coke Crushing</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_tests">CCI Tests</string>
+    <string name="nav_operations">Operations</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Plant Control</string>
+    <string name="running_line_label">RUNNING LINE</string>
+    <string name="standby_line_label">STANDBY LINE</string>
+    <string name="quick_changeover">Changeover</string>
+    <string name="share_daily_whatsapp">Share Daily Report on WhatsApp</string>
+    <string name="kpi_today_cci">Today Avg CCI</string>
+    <string name="kpi_tests_logged">Today Tests</string>
+    <string name="kpi_fines_increase">Avg Fines Gain</string>
+    <string name="kpi_active_alerts">Active Alerts</string>
+    <string name="cci_trend_title">7-Day CCI Performance</string>
+    <string name="active_alerts_title">Active Plant Alerts</string>
+    <string name="recent_tests_title">Recent Sieve Tests</string>
+
+    <!-- Tests -->
+    <string name="new_cci_test">New CCI Test</string>
+    <string name="test_details">Sieve Analysis Details</string>
+    <string name="before_crushing">Before Crushing (kg)</string>
+    <string name="after_crushing">After Crushing (kg)</string>
+    <string name="save_test">Save Test Record</string>
+
+    <!-- Operations -->
+    <string name="tab_changeover">Changeover</string>
+    <string name="tab_maintenance">Maintenance</string>
+    <string name="execute_changeover">Execute Line Changeover</string>
+    <string name="log_maintenance">Log Maintenance</string>
+
+    <!-- Reports -->
+    <string name="reports_title">Daily Reports &amp; Export</string>
+    <string name="whatsapp_share_text">Share via WhatsApp</string>
+    <string name="whatsapp_share_pdf">Share PDF on WhatsApp</string>
+    <string name="copy_report">Copy Text</string>
+    <string name="export_file">Export &amp; Share</string>
+
+    <!-- Auth & Settings -->
+    <string name="sign_in">Sign In</string>
+    <string name="switch_user">Switch User</string>
+    <string name="backup_export">Export Local Backup (JSON)</string>
+</resources>
