@@ -1,0 +1,389 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Core Auth & Validation Helpers
+    // -------------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string
+        && id.size() >= 1
+        && id.size() <= 128
+        && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isNonEmptyString(val, maxLen) {
+      return val is string && val.size() >= 1 && val.size() <= maxLen;
+    }
+
+    function isBoundedString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function isValidTimestamp(val) {
+      return val is timestamp && val <= request.time;
+    }
+
+    function isNumberInRange(val, minVal, maxVal) {
+      return val is number && val >= minVal && val <= maxVal;
+    }
+
+    function isIntInRange(val, minVal, maxVal) {
+      return val is int && val >= minVal && val <= maxVal;
+    }
+
+    function immutableOwnerAndCreatedAt() {
+      return incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt;
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validators
+    // -------------------------------------------------------------------------
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'displayName', 'email', 'plantDepartment', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'userId', 'displayName', 'email', 'plantDepartment', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && isBoundedString(data.displayName, 120)
+        && isBoundedString(data.email, 254)
+        && isBoundedString(data.plantDepartment, 120)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCciTest(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'sampleId', 'testDateTime', 'testDate', 'shift', 'crusherLine',
+          'cokeType', 'cokeSource', 'operatorName',
+          'beforeFrac050', 'beforeFrac100', 'beforeFrac300', 'beforeFracPlus3', 'beforeTotal',
+          'afterFrac050', 'afterFrac100', 'afterFrac300', 'afterFracPlus3', 'afterTotal',
+          'beforeFinesPct', 'afterFinesPct', 'crushingIndex', 'finesIncreasePp',
+          'remarks', 'deleted', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'userId', 'sampleId', 'testDateTime', 'testDate', 'shift', 'crusherLine',
+          'cokeType', 'cokeSource', 'operatorName',
+          'beforeFrac050', 'beforeFrac100', 'beforeFrac300', 'beforeFracPlus3', 'beforeTotal',
+          'afterFrac050', 'afterFrac100', 'afterFrac300', 'afterFracPlus3', 'afterTotal',
+          'beforeFinesPct', 'afterFinesPct', 'crushingIndex', 'finesIncreasePp',
+          'remarks', 'deleted', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && isNonEmptyString(data.sampleId, 64)
+        && isNonEmptyString(data.testDateTime, 40)
+        && isNonEmptyString(data.testDate, 20)
+        && data.shift in ['A', 'B', 'C']
+        && isNonEmptyString(data.crusherLine, 32)
+        && isNonEmptyString(data.cokeType, 64)
+        && isBoundedString(data.cokeSource, 120)
+        && isNonEmptyString(data.operatorName, 100)
+        && isNumberInRange(data.beforeFrac050, 0, 100000)
+        && isNumberInRange(data.beforeFrac100, 0, 100000)
+        && isNumberInRange(data.beforeFrac300, 0, 100000)
+        && isNumberInRange(data.beforeFracPlus3, 0, 100000)
+        && isNumberInRange(data.beforeTotal, 0, 400000)
+        && isNumberInRange(data.afterFrac050, 0, 100000)
+        && isNumberInRange(data.afterFrac100, 0, 100000)
+        && isNumberInRange(data.afterFrac300, 0, 100000)
+        && isNumberInRange(data.afterFracPlus3, 0, 100000)
+        && isNumberInRange(data.afterTotal, 0, 400000)
+        && isNumberInRange(data.beforeFinesPct, 0, 100)
+        && isNumberInRange(data.afterFinesPct, 0, 100)
+        && isNumberInRange(data.crushingIndex, 0, 100)
+        && isNumberInRange(data.finesIncreasePp, -100, 100)
+        && isBoundedString(data.remarks, 500)
+        && data.deleted is bool
+        && isNonEmptyString(data.createdBy, 100)
+        && isNonEmptyString(data.updatedBy, 100)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidDailyReport(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'reportDate', 'shiftScope', 'runningLine', 'standbyLine',
+          'rollerGapMm', 'feedRateTph', 'rollerPressureBar', 'cokeMoisturePct',
+          'sampleCount',
+          'avgBeforeFrac050', 'avgBeforeFrac100', 'avgBeforeFrac300', 'avgBeforeFracPlus3',
+          'avgAfterFrac050', 'avgAfterFrac100', 'avgAfterFrac300', 'avgAfterFracPlus3',
+          'avgBeforeFinesPct', 'avgAfterFinesPct', 'avgCrushingIndex',
+          'minCrushingIndex', 'maxCrushingIndex', 'avgFinesIncreasePp', 'targetCompliancePct',
+          'changeoverCount', 'maintenanceCount', 'remarks', 'summaryText',
+          'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'userId', 'reportDate', 'shiftScope', 'runningLine', 'standbyLine',
+          'rollerGapMm', 'feedRateTph', 'rollerPressureBar', 'cokeMoisturePct',
+          'sampleCount',
+          'avgBeforeFrac050', 'avgBeforeFrac100', 'avgBeforeFrac300', 'avgBeforeFracPlus3',
+          'avgAfterFrac050', 'avgAfterFrac100', 'avgAfterFrac300', 'avgAfterFracPlus3',
+          'avgBeforeFinesPct', 'avgAfterFinesPct', 'avgCrushingIndex',
+          'minCrushingIndex', 'maxCrushingIndex', 'avgFinesIncreasePp', 'targetCompliancePct',
+          'changeoverCount', 'maintenanceCount', 'remarks', 'summaryText',
+          'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && isNonEmptyString(data.reportDate, 20)
+        && data.shiftScope in ['ALL', 'A', 'B', 'C']
+        && isNonEmptyString(data.runningLine, 32)
+        && isNonEmptyString(data.standbyLine, 32)
+        && isNumberInRange(data.rollerGapMm, 0, 500)
+        && isNumberInRange(data.feedRateTph, 0, 10000)
+        && isNumberInRange(data.rollerPressureBar, 0, 1000)
+        && isNumberInRange(data.cokeMoisturePct, 0, 100)
+        && isIntInRange(data.sampleCount, 0, 10000)
+        && isNumberInRange(data.avgBeforeFrac050, 0, 100000)
+        && isNumberInRange(data.avgBeforeFrac100, 0, 100000)
+        && isNumberInRange(data.avgBeforeFrac300, 0, 100000)
+        && isNumberInRange(data.avgBeforeFracPlus3, 0, 100000)
+        && isNumberInRange(data.avgAfterFrac050, 0, 100000)
+        && isNumberInRange(data.avgAfterFrac100, 0, 100000)
+        && isNumberInRange(data.avgAfterFrac300, 0, 100000)
+        && isNumberInRange(data.avgAfterFracPlus3, 0, 100000)
+        && isNumberInRange(data.avgBeforeFinesPct, 0, 100)
+        && isNumberInRange(data.avgAfterFinesPct, 0, 100)
+        && isNumberInRange(data.avgCrushingIndex, 0, 100)
+        && isNumberInRange(data.minCrushingIndex, 0, 100)
+        && isNumberInRange(data.maxCrushingIndex, 0, 100)
+        && isNumberInRange(data.avgFinesIncreasePp, -100, 100)
+        && isNumberInRange(data.targetCompliancePct, 0, 100)
+        && isIntInRange(data.changeoverCount, 0, 1000)
+        && isIntInRange(data.maintenanceCount, 0, 1000)
+        && isBoundedString(data.remarks, 1000)
+        && isBoundedString(data.summaryText, 8000)
+        && isNonEmptyString(data.createdBy, 100)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCrusherStatus(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'runningLine', 'standbyLine', 'lastChangeoverAt',
+          'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'userId', 'runningLine', 'standbyLine', 'lastChangeoverAt',
+          'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && isNonEmptyString(data.runningLine, 32)
+        && isNonEmptyString(data.standbyLine, 32)
+        && isNonEmptyString(data.lastChangeoverAt, 40)
+        && isNonEmptyString(data.updatedBy, 100)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidChangeover(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'eventDateTime', 'previousLine', 'newLine', 'newStandbyLine',
+          'reason', 'manualOverride', 'authorizedBy', 'remarks',
+          'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'userId', 'eventDateTime', 'previousLine', 'newLine', 'newStandbyLine',
+          'reason', 'manualOverride', 'authorizedBy', 'remarks',
+          'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && isNonEmptyString(data.eventDateTime, 40)
+        && isNonEmptyString(data.previousLine, 32)
+        && isNonEmptyString(data.newLine, 32)
+        && isNonEmptyString(data.newStandbyLine, 32)
+        && isNonEmptyString(data.reason, 200)
+        && data.manualOverride is bool
+        && isNonEmptyString(data.authorizedBy, 100)
+        && isBoundedString(data.remarks, 500)
+        && isNonEmptyString(data.createdBy, 100)
+        && isNonEmptyString(data.updatedBy, 100)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidMaintenance(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'crusherLine', 'activityDate', 'activityType', 'details',
+          'measurements', 'rollerCondition', 'completedBy', 'approvedBy', 'nextDueDate',
+          'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'userId', 'crusherLine', 'activityDate', 'activityType', 'details',
+          'measurements', 'rollerCondition', 'completedBy', 'approvedBy', 'nextDueDate',
+          'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && isNonEmptyString(data.crusherLine, 32)
+        && isNonEmptyString(data.activityDate, 20)
+        && isNonEmptyString(data.activityType, 100)
+        && isNonEmptyString(data.details, 1000)
+        && isBoundedString(data.measurements, 300)
+        && isBoundedString(data.rollerCondition, 100)
+        && isNonEmptyString(data.completedBy, 100)
+        && isBoundedString(data.approvedBy, 100)
+        && isBoundedString(data.nextDueDate, 20)
+        && isNonEmptyString(data.createdBy, 100)
+        && isNonEmptyString(data.updatedBy, 100)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAlert(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'timestamp', 'severity', 'title', 'message',
+          'crusherLine', 'acknowledged', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'userId', 'timestamp', 'severity', 'title', 'message',
+          'crusherLine', 'acknowledged', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == userId
+        && isNonEmptyString(data.timestamp, 40)
+        && data.severity in ['CRITICAL', 'WARNING', 'INFO']
+        && isNonEmptyString(data.title, 200)
+        && isNonEmptyString(data.message, 1000)
+        && isNonEmptyString(data.crusherLine, 32)
+        && data.acknowledged is bool
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Match Rules
+    // -------------------------------------------------------------------------
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId);
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && immutableOwnerAndCreatedAt()
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'email', 'plantDepartment', 'updatedAt'
+        ])
+        && isValidUserProfile(incoming(), userId);
+      allow delete: if isOwner(userId);
+
+      match /cci_tests/{testId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(testId)
+          && isValidCciTest(incoming(), userId);
+        allow update: if isOwner(userId)
+          && isValidId(testId)
+          && immutableOwnerAndCreatedAt()
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'deleted', 'remarks', 'updatedBy', 'updatedAt'
+          ])
+          && isValidCciTest(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /daily_reports/{reportId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(reportId)
+          && isValidDailyReport(incoming(), userId);
+        allow update: if isOwner(userId)
+          && isValidId(reportId)
+          && immutableOwnerAndCreatedAt()
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'remarks', 'summaryText', 'updatedAt'
+          ])
+          && isValidDailyReport(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /crusher_status/{statusId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(statusId)
+          && isValidCrusherStatus(incoming(), userId);
+        allow update: if isOwner(userId)
+          && isValidId(statusId)
+          && immutableOwnerAndCreatedAt()
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'runningLine', 'standbyLine', 'lastChangeoverAt', 'updatedBy', 'updatedAt'
+          ])
+          && isValidCrusherStatus(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /changeovers/{changeoverId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(changeoverId)
+          && isValidChangeover(incoming(), userId);
+        allow update: if isOwner(userId)
+          && isValidId(changeoverId)
+          && immutableOwnerAndCreatedAt()
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'remarks', 'updatedBy', 'updatedAt'
+          ])
+          && isValidChangeover(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /maintenance/{maintenanceId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(maintenanceId)
+          && isValidMaintenance(incoming(), userId);
+        allow update: if isOwner(userId)
+          && isValidId(maintenanceId)
+          && immutableOwnerAndCreatedAt()
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'approvedBy', 'details', 'measurements', 'rollerCondition',
+            'nextDueDate', 'updatedBy', 'updatedAt'
+          ])
+          && isValidMaintenance(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /alerts/{alertId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(alertId)
+          && isValidAlert(incoming(), userId);
+        allow update: if isOwner(userId)
+          && isValidId(alertId)
+          && immutableOwnerAndCreatedAt()
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'acknowledged', 'updatedAt'
+          ])
+          && isValidAlert(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

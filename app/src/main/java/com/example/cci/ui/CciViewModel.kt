@@ -23,6 +23,8 @@ import com.example.cci.data.local.entity.CrusherStatusEntity
 import com.example.cci.data.local.entity.DailyReport
 import com.example.cci.data.local.entity.MaintenanceEntity
 import com.example.cci.data.local.entity.UserEntity
+import com.example.cci.data.remote.CloudSyncSummary
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,7 +55,10 @@ data class CciUiState(
     val settings: PlantSettings = PlantSettings(),
     val session: ActiveSession = ActiveSession(0, "shiftincharge", "Sinter Shift In-Charge", UserRole.SHIFT_IN_CHARGE),
     val users: List<UserEntity> = emptyList(),
-    val auditLogs: List<AuditLogEntity> = emptyList()
+    val auditLogs: List<AuditLogEntity> = emptyList(),
+    val cloudUserName: String = "",
+    val cloudUserEmail: String = "",
+    val cloudSync: CloudSyncSummary = CloudSyncSummary()
 ) {
     val todayDate: String get() = DateTimeUtils.todayIso()
     val todayTests: List<CciTestEntity> get() = tests.filter { it.testDate == todayDate }
@@ -66,7 +71,10 @@ data class CciUiState(
 
 class CciViewModel(
     application: Application,
-    private val container: AppContainer
+    private val container: AppContainer,
+    private val firebaseUserId: String,
+    private val firebaseDisplayName: String,
+    private val firebaseEmail: String
 ) : AndroidViewModel(application) {
 
     private val _snackbarEvents = MutableSharedFlow<String>(extraBufferCapacity = 4)
@@ -74,6 +82,9 @@ class CciViewModel(
 
     private val _suggestedSampleId = MutableStateFlow(DateTimeUtils.generateSampleId(DateTimeUtils.todayIso(), 1))
     val suggestedSampleId: StateFlow<String> = _suggestedSampleId
+
+    private val _isManualSyncing = MutableStateFlow(false)
+    private val _cloudSyncError = MutableStateFlow<String?>(null)
 
     private val coreDataFlow = combine(
         container.testRepository.activeTests,
@@ -95,7 +106,47 @@ class CciViewModel(
         MetaBundle(settings, session, users, logs, dailyReports)
     }
 
-    val uiState: StateFlow<CciUiState> = combine(coreDataFlow, metaDataFlow) { core, meta ->
+    private val cloudSummaryFlow = combine(
+        container.firestorePlantRepository.observeTests(firebaseUserId),
+        container.firestorePlantRepository.observeDailyReports(firebaseUserId),
+        container.firestorePlantRepository.observeChangeovers(firebaseUserId),
+        container.firestorePlantRepository.observeMaintenance(firebaseUserId)
+    ) { tests, reports, changeovers, maintenance ->
+        CloudSyncSummary(
+            isConnected = true,
+            isSyncing = false,
+            syncedTestCount = tests.size,
+            syncedReportCount = reports.size,
+            syncedChangeoverCount = changeovers.size,
+            syncedMaintenanceCount = maintenance.size,
+            lastError = null
+        )
+    }.catch { err ->
+        emit(
+            CloudSyncSummary(
+                isConnected = false,
+                isSyncing = false,
+                lastError = err.message ?: "Cloud sync unavailable"
+            )
+        )
+    }
+
+    private val cloudStateFlow = combine(
+        cloudSummaryFlow,
+        _isManualSyncing,
+        _cloudSyncError
+    ) { summary, manualSyncing, manualError ->
+        summary.copy(
+            isSyncing = manualSyncing,
+            lastError = manualError ?: summary.lastError
+        )
+    }
+
+    val uiState: StateFlow<CciUiState> = combine(
+        coreDataFlow,
+        metaDataFlow,
+        cloudStateFlow
+    ) { core, meta, cloud ->
         CciUiState(
             tests = core.tests,
             crusherStatus = core.status,
@@ -106,13 +157,54 @@ class CciViewModel(
             settings = meta.settings,
             session = meta.session,
             users = meta.users,
-            auditLogs = meta.auditLogs
+            auditLogs = meta.auditLogs,
+            cloudUserName = firebaseDisplayName,
+            cloudUserEmail = firebaseEmail,
+            cloudSync = cloud
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = CciUiState()
+        initialValue = CciUiState(
+            cloudUserName = firebaseDisplayName,
+            cloudUserEmail = firebaseEmail
+        )
     )
+
+    init {
+        viewModelScope.launch {
+            container.firestorePlantRepository.ensureUserProfile(
+                displayName = firebaseDisplayName,
+                email = firebaseEmail,
+                plantDepartment = AppConstants.DEFAULT_DEPARTMENT
+            ).onFailure { err ->
+                _cloudSyncError.value = err.message
+            }
+        }
+    }
+
+    fun syncAllLocalToCloud() {
+        viewModelScope.launch {
+            _isManualSyncing.value = true
+            _cloudSyncError.value = null
+            val current = uiState.value
+            val result = container.firestorePlantRepository.syncLocalSnapshotToCloud(
+                crusherStatus = current.crusherStatus,
+                tests = current.tests,
+                dailyReports = current.dailyReports,
+                changeovers = current.changeovers,
+                maintenance = current.maintenance,
+                alerts = current.activeAlerts
+            )
+            _isManualSyncing.value = false
+            result.onSuccess { count ->
+                _snackbarEvents.tryEmit("Synced $count plant records to Firebase Cloud")
+            }.onFailure { err ->
+                _cloudSyncError.value = err.message ?: "Cloud sync failed"
+                _snackbarEvents.tryEmit("Cloud sync error: ${err.message ?: "Unable to sync"}")
+            }
+        }
+    }
 
     fun refreshNextSampleId(dateIso: String = DateTimeUtils.todayIso()) {
         viewModelScope.launch {
@@ -158,10 +250,12 @@ class CciViewModel(
                 afterPlus3 = afterPlus3,
                 remarks = remarks
             )
-            result.onSuccess {
-                _snackbarEvents.tryEmit("Saved ${it.sampleId} (CCI ${"%.2f".format(it.crushingIndex)}%)")
+            result.onSuccess { savedTest ->
+                _snackbarEvents.tryEmit("Saved ${savedTest.sampleId} (CCI ${"%.2f".format(savedTest.crushingIndex)}%)")
                 refreshNextSampleId(testDate)
                 onSuccess()
+                container.firestorePlantRepository.saveTest(savedTest)
+                    .onFailure { err -> _cloudSyncError.value = err.message }
             }.onFailure { err ->
                 _snackbarEvents.tryEmit(err.message ?: "Unable to save test")
             }
@@ -170,8 +264,11 @@ class CciViewModel(
 
     fun deleteTest(test: CciTestEntity) {
         viewModelScope.launch {
+            val actor = uiState.value.session.username
             container.testRepository.deleteTest(test)
             _snackbarEvents.tryEmit("Deleted sample ${test.sampleId}")
+            container.firestorePlantRepository.softDeleteTest(test, actor)
+                .onFailure { err -> _cloudSyncError.value = err.message }
         }
     }
 
@@ -179,6 +276,8 @@ class CciViewModel(
         viewModelScope.launch {
             container.testRepository.acknowledgeAlert(alertId)
             _snackbarEvents.tryEmit("Alert acknowledged")
+            container.firestorePlantRepository.acknowledgeAlert(alertId)
+                .onFailure { err -> _cloudSyncError.value = err.message }
         }
     }
 
@@ -197,9 +296,13 @@ class CciViewModel(
                 reason = reason,
                 manualOverride = manualOverride,
                 remarks = remarks
-            ).onSuccess {
+            ).onSuccess { (statusEntity, changeoverEntity) ->
                 _snackbarEvents.tryEmit("Switched running line to $newRunningLine")
                 onSuccess()
+                container.firestorePlantRepository.upsertCrusherStatus(statusEntity)
+                    .onFailure { err -> _cloudSyncError.value = err.message }
+                container.firestorePlantRepository.saveChangeover(changeoverEntity)
+                    .onFailure { err -> _cloudSyncError.value = err.message }
             }.onFailure { err ->
                 _snackbarEvents.tryEmit(err.message ?: "Changeover failed")
             }
@@ -225,9 +328,11 @@ class CciViewModel(
                 measurements = measurements,
                 rollerCondition = rollerCondition,
                 nextDueDate = nextDueDate
-            ).onSuccess {
+            ).onSuccess { savedMaintenance ->
                 _snackbarEvents.tryEmit("Logged $activityType for $crusherLine")
                 onSuccess()
+                container.firestorePlantRepository.saveMaintenance(savedMaintenance)
+                    .onFailure { err -> _cloudSyncError.value = err.message }
             }.onFailure { err ->
                 _snackbarEvents.tryEmit(err.message ?: "Unable to log maintenance")
             }
@@ -236,8 +341,11 @@ class CciViewModel(
 
     fun approveMaintenance(record: MaintenanceEntity) {
         viewModelScope.launch {
+            val actor = uiState.value.session.username
             container.maintenanceRepository.approveMaintenance(record)
             _snackbarEvents.tryEmit("Approved ${record.activityType} on ${record.crusherLine}")
+            container.firestorePlantRepository.approveMaintenance(record, actor)
+                .onFailure { err -> _cloudSyncError.value = err.message }
         }
     }
 
@@ -449,6 +557,8 @@ class CciViewModel(
             ).onSuccess { saved ->
                 _snackbarEvents.tryEmit("Saved Daily Report for ${DateTimeUtils.formatDisplayDate(saved.reportDate)}")
                 onSuccess()
+                container.firestorePlantRepository.saveDailyReport(saved)
+                    .onFailure { err -> _cloudSyncError.value = err.message }
             }.onFailure { err ->
                 _snackbarEvents.tryEmit(err.message ?: "Unable to save daily report")
             }
@@ -459,6 +569,8 @@ class CciViewModel(
         viewModelScope.launch {
             container.dailyReportRepository.deleteDailyReport(report)
             _snackbarEvents.tryEmit("Deleted Daily Report (${DateTimeUtils.formatDisplayDate(report.reportDate)})")
+            container.firestorePlantRepository.deleteDailyReport(report)
+                .onFailure { err -> _cloudSyncError.value = err.message }
         }
     }
 
@@ -488,11 +600,23 @@ class CciViewModel(
     )
 
     companion object {
-        fun factory(application: Application, container: AppContainer): ViewModelProvider.Factory =
+        fun factory(
+            application: Application,
+            container: AppContainer,
+            firebaseUserId: String,
+            firebaseDisplayName: String,
+            firebaseEmail: String
+        ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return CciViewModel(application, container) as T
+                    return CciViewModel(
+                        application = application,
+                        container = container,
+                        firebaseUserId = firebaseUserId,
+                        firebaseDisplayName = firebaseDisplayName,
+                        firebaseEmail = firebaseEmail
+                    ) as T
                 }
             }
     }

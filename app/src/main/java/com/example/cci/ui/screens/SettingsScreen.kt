@@ -18,11 +18,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -62,6 +67,8 @@ import java.util.Locale
 fun SettingsScreen(
     state: CciUiState,
     onSwitchUserClick: () -> Unit,
+    onSyncToCloud: () -> Unit,
+    onSignOut: () -> Unit,
     onSavePlantConfig: (company: String, dept: String, minCci: Double, maxGain: Double, signOff: String) -> Unit,
     onSetThemeMode: (String) -> Unit,
     onCreateUser: (username: String, fullName: String, password: String, role: UserRole) -> Unit,
@@ -81,6 +88,111 @@ fun SettingsScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // 0. Firebase Cloud Account & Real-Time Firestore Sync
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = if (state.cloudSync.isConnected) Icons.Rounded.CloudDone else Icons.Rounded.CloudOff,
+                                contentDescription = "Cloud sync status",
+                                tint = if (state.cloudSync.isConnected) PlantEmerald else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = state.cloudUserName.ifBlank { "Google Account" },
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = state.cloudUserEmail.ifBlank { "Signed in with Google" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        StatusPill(
+                            text = if (state.cloudSync.isConnected) "Cloud Live" else "Offline",
+                            containerColor = if (state.cloudSync.isConnected) {
+                                PlantEmerald.copy(alpha = 0.16f)
+                            } else {
+                                MaterialTheme.colorScheme.errorContainer
+                            },
+                            contentColor = if (state.cloudSync.isConnected) {
+                                PlantEmerald
+                            } else {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            }
+                        )
+                    }
+
+                    Text(
+                        text = "Cloud Firestore: ${state.cloudSync.syncedTestCount} tests • ${state.cloudSync.syncedReportCount} reports • ${state.cloudSync.syncedChangeoverCount} changeovers • ${state.cloudSync.syncedMaintenanceCount} maintenance",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    state.cloudSync.lastError?.let { err ->
+                        Text(
+                            text = err,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onSyncToCloud,
+                            enabled = !state.cloudSync.isSyncing,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("sync_to_cloud_button")
+                        ) {
+                            if (state.cloudSync.isSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (state.cloudSync.isSyncing) "Syncing..." else "Sync to Cloud")
+                        }
+                        OutlinedButton(
+                            onClick = onSignOut,
+                            modifier = Modifier.testTag("firebase_sign_out_button")
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Sign Out")
+                        }
+                    }
+                }
+            }
+        }
+
         // 1. Active User Profile & Role Switch
         item {
             Card(

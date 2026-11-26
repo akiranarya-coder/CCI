@@ -1,15 +1,20 @@
 package com.example.cci
 
 import android.app.Application
+import com.example.R
 import com.example.cci.core.security.SessionManager
 import com.example.cci.data.datastore.AppSettingsDataStore
 import com.example.cci.data.local.CciDatabase
+import com.example.cci.data.remote.FirestorePlantRepository
 import com.example.cci.data.repository.AuthRepository
 import com.example.cci.data.repository.CrusherRepository
 import com.example.cci.data.repository.DailyReportRepository
 import com.example.cci.data.repository.MaintenanceRepository
 import com.example.cci.data.repository.SettingsRepository
 import com.example.cci.data.repository.TestRepository
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +24,14 @@ class AppContainer(application: Application) {
     val database: CciDatabase = CciDatabase.getInstance(application)
     val settingsDataStore: AppSettingsDataStore = AppSettingsDataStore(application)
     val sessionManager: SessionManager = SessionManager()
+
+    private val firestoreDatabaseId: String =
+        application.getString(R.string.firestore_database_id)
+    val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(firestoreDatabaseId)
+    val firestorePlantRepository: FirestorePlantRepository = FirestorePlantRepository(
+        firestore = firestore,
+        auth = Firebase.auth
+    )
 
     val authRepository: AuthRepository = AuthRepository(
         userDao = database.userDao(),

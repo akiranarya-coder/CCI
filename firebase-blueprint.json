@@ -1,0 +1,228 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated plant engineer profile synced via Firebase Auth",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner" },
+        "displayName": { "type": "string", "description": "Operator or engineer display name" },
+        "email": { "type": "string", "format": "email", "description": "Authenticated Google account email" },
+        "plantDepartment": { "type": "string", "description": "Plant or department label" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update" }
+      },
+      "required": ["userId", "displayName", "email", "plantDepartment", "createdAt", "updatedAt"]
+    },
+    "CciTestRecord": {
+      "title": "CciTestRecord",
+      "description": "Sieve analysis test record for Coke Crushing Index calculation",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "sampleId": { "type": "string" },
+        "testDateTime": { "type": "string" },
+        "testDate": { "type": "string" },
+        "shift": { "type": "string", "enum": ["A", "B", "C"] },
+        "crusherLine": { "type": "string" },
+        "cokeType": { "type": "string" },
+        "cokeSource": { "type": "string" },
+        "operatorName": { "type": "string" },
+        "beforeFrac050": { "type": "number" },
+        "beforeFrac100": { "type": "number" },
+        "beforeFrac300": { "type": "number" },
+        "beforeFracPlus3": { "type": "number" },
+        "beforeTotal": { "type": "number" },
+        "afterFrac050": { "type": "number" },
+        "afterFrac100": { "type": "number" },
+        "afterFrac300": { "type": "number" },
+        "afterFracPlus3": { "type": "number" },
+        "afterTotal": { "type": "number" },
+        "beforeFinesPct": { "type": "number" },
+        "afterFinesPct": { "type": "number" },
+        "crushingIndex": { "type": "number" },
+        "finesIncreasePp": { "type": "number" },
+        "remarks": { "type": "string" },
+        "deleted": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "sampleId", "testDateTime", "testDate", "shift", "crusherLine",
+        "cokeType", "cokeSource", "operatorName",
+        "beforeFrac050", "beforeFrac100", "beforeFrac300", "beforeFracPlus3", "beforeTotal",
+        "afterFrac050", "afterFrac100", "afterFrac300", "afterFracPlus3", "afterTotal",
+        "beforeFinesPct", "afterFinesPct", "crushingIndex", "finesIncreasePp",
+        "remarks", "deleted", "createdBy", "updatedBy", "createdAt", "updatedAt"
+      ]
+    },
+    "DailyReportRecord": {
+      "title": "DailyReportRecord",
+      "description": "Persisted daily plant CCI report with crusher operating parameters and aggregated sieve results",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "reportDate": { "type": "string" },
+        "shiftScope": { "type": "string", "enum": ["ALL", "A", "B", "C"] },
+        "runningLine": { "type": "string" },
+        "standbyLine": { "type": "string" },
+        "rollerGapMm": { "type": "number" },
+        "feedRateTph": { "type": "number" },
+        "rollerPressureBar": { "type": "number" },
+        "cokeMoisturePct": { "type": "number" },
+        "sampleCount": { "type": "integer" },
+        "avgBeforeFrac050": { "type": "number" },
+        "avgBeforeFrac100": { "type": "number" },
+        "avgBeforeFrac300": { "type": "number" },
+        "avgBeforeFracPlus3": { "type": "number" },
+        "avgAfterFrac050": { "type": "number" },
+        "avgAfterFrac100": { "type": "number" },
+        "avgAfterFrac300": { "type": "number" },
+        "avgAfterFracPlus3": { "type": "number" },
+        "avgBeforeFinesPct": { "type": "number" },
+        "avgAfterFinesPct": { "type": "number" },
+        "avgCrushingIndex": { "type": "number" },
+        "minCrushingIndex": { "type": "number" },
+        "maxCrushingIndex": { "type": "number" },
+        "avgFinesIncreasePp": { "type": "number" },
+        "targetCompliancePct": { "type": "number" },
+        "changeoverCount": { "type": "integer" },
+        "maintenanceCount": { "type": "integer" },
+        "remarks": { "type": "string" },
+        "summaryText": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "reportDate", "shiftScope", "runningLine", "standbyLine",
+        "rollerGapMm", "feedRateTph", "rollerPressureBar", "cokeMoisturePct",
+        "sampleCount",
+        "avgBeforeFrac050", "avgBeforeFrac100", "avgBeforeFrac300", "avgBeforeFracPlus3",
+        "avgAfterFrac050", "avgAfterFrac100", "avgAfterFrac300", "avgAfterFracPlus3",
+        "avgBeforeFinesPct", "avgAfterFinesPct", "avgCrushingIndex",
+        "minCrushingIndex", "maxCrushingIndex", "avgFinesIncreasePp", "targetCompliancePct",
+        "changeoverCount", "maintenanceCount", "remarks", "summaryText",
+        "createdBy", "createdAt", "updatedAt"
+      ]
+    },
+    "CrusherStatusRecord": {
+      "title": "CrusherStatusRecord",
+      "description": "Current active running and standby crusher line status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "runningLine": { "type": "string" },
+        "standbyLine": { "type": "string" },
+        "lastChangeoverAt": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "runningLine", "standbyLine", "lastChangeoverAt", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "ChangeoverRecord": {
+      "title": "ChangeoverRecord",
+      "description": "Crusher line changeover audit event",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "eventDateTime": { "type": "string" },
+        "previousLine": { "type": "string" },
+        "newLine": { "type": "string" },
+        "newStandbyLine": { "type": "string" },
+        "reason": { "type": "string" },
+        "manualOverride": { "type": "boolean" },
+        "authorizedBy": { "type": "string" },
+        "remarks": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "eventDateTime", "previousLine", "newLine", "newStandbyLine",
+        "reason", "manualOverride", "authorizedBy", "remarks",
+        "createdBy", "updatedBy", "createdAt", "updatedAt"
+      ]
+    },
+    "MaintenanceRecord": {
+      "title": "MaintenanceRecord",
+      "description": "Crusher maintenance activity and approval record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "crusherLine": { "type": "string" },
+        "activityDate": { "type": "string" },
+        "activityType": { "type": "string" },
+        "details": { "type": "string" },
+        "measurements": { "type": "string" },
+        "rollerCondition": { "type": "string" },
+        "completedBy": { "type": "string" },
+        "approvedBy": { "type": "string" },
+        "nextDueDate": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "crusherLine", "activityDate", "activityType", "details",
+        "measurements", "rollerCondition", "completedBy", "approvedBy", "nextDueDate",
+        "createdBy", "updatedBy", "createdAt", "updatedAt"
+      ]
+    },
+    "AlertRecord": {
+      "title": "AlertRecord",
+      "description": "Plant CCI threshold breach alert",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "severity": { "type": "string", "enum": ["CRITICAL", "WARNING", "INFO"] },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "crusherLine": { "type": "string" },
+        "acknowledged": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "timestamp", "severity", "title", "message",
+        "crusherLine", "acknowledged", "createdAt", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile document owned by authenticated user"
+    },
+    "/users/{userId}/cci_tests/{testId}": {
+      "schema": { "$ref": "#/entities/CciTestRecord" },
+      "description": "User-scoped CCI sieve analysis test records"
+    },
+    "/users/{userId}/daily_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/DailyReportRecord" },
+      "description": "User-scoped persisted daily plant CCI reports"
+    },
+    "/users/{userId}/crusher_status/{statusId}": {
+      "schema": { "$ref": "#/entities/CrusherStatusRecord" },
+      "description": "User-scoped active crusher running/standby line status"
+    },
+    "/users/{userId}/changeovers/{changeoverId}": {
+      "schema": { "$ref": "#/entities/ChangeoverRecord" },
+      "description": "User-scoped crusher line changeover history"
+    },
+    "/users/{userId}/maintenance/{maintenanceId}": {
+      "schema": { "$ref": "#/entities/MaintenanceRecord" },
+      "description": "User-scoped crusher maintenance logs and approvals"
+    },
+    "/users/{userId}/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/AlertRecord" },
+      "description": "User-scoped plant CCI threshold alerts"
+    }
+  }
+}

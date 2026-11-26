@@ -279,39 +279,39 @@ class CrusherRepository(
         reason: String,
         manualOverride: Boolean,
         remarks: String
-    ): Result<Unit> {
+    ): Result<Pair<CrusherStatusEntity, ChangeoverEntity>> {
         val now = DateTimeUtils.nowDateTimeIso()
         val actor = sessionManager.currentUsername()
         val current = database.crusherStatusDao().getStatus()
         val prevLine = current?.runningLine ?: newStandbyLine
 
+        val statusEntity = CrusherStatusEntity(
+            id = 1,
+            runningLine = newRunningLine,
+            standbyLine = newStandbyLine,
+            lastChangeoverAt = now,
+            updatedAt = now,
+            updatedBy = actor
+        )
+        val changeoverEntity = ChangeoverEntity(
+            eventDateTime = now,
+            previousLine = prevLine,
+            newLine = newRunningLine,
+            newStandbyLine = newStandbyLine,
+            reason = reason,
+            manualOverride = manualOverride,
+            authorizedBy = actor,
+            remarks = remarks.trim(),
+            createdAt = now,
+            createdBy = actor,
+            updatedAt = now,
+            updatedBy = actor
+        )
+        var insertedChangeoverId = 0L
+
         database.withTransaction {
-            database.crusherStatusDao().upsert(
-                CrusherStatusEntity(
-                    id = 1,
-                    runningLine = newRunningLine,
-                    standbyLine = newStandbyLine,
-                    lastChangeoverAt = now,
-                    updatedAt = now,
-                    updatedBy = actor
-                )
-            )
-            database.changeoverDao().insert(
-                ChangeoverEntity(
-                    eventDateTime = now,
-                    previousLine = prevLine,
-                    newLine = newRunningLine,
-                    newStandbyLine = newStandbyLine,
-                    reason = reason,
-                    manualOverride = manualOverride,
-                    authorizedBy = actor,
-                    remarks = remarks.trim(),
-                    createdAt = now,
-                    createdBy = actor,
-                    updatedAt = now,
-                    updatedBy = actor
-                )
-            )
+            database.crusherStatusDao().upsert(statusEntity)
+            insertedChangeoverId = database.changeoverDao().insert(changeoverEntity)
             database.auditLogDao().insert(
                 AuditLogEntity(
                     timestamp = now,
@@ -322,7 +322,7 @@ class CrusherRepository(
                 )
             )
         }
-        return Result.success(Unit)
+        return Result.success(statusEntity to changeoverEntity.copy(id = insertedChangeoverId))
     }
 }
 
@@ -341,29 +341,28 @@ class MaintenanceRepository(
         measurements: String,
         rollerCondition: String,
         nextDueDate: String
-    ): Result<Unit> {
+    ): Result<MaintenanceEntity> {
         if (details.isBlank()) {
             return Result.failure(IllegalArgumentException("Please enter maintenance work details"))
         }
         val now = DateTimeUtils.nowDateTimeIso()
         val actor = sessionManager.currentUsername()
-        maintenanceDao.insert(
-            MaintenanceEntity(
-                crusherLine = crusherLine,
-                activityDate = activityDate,
-                activityType = activityType,
-                details = details.trim(),
-                measurements = measurements.trim(),
-                rollerCondition = rollerCondition,
-                completedBy = actor,
-                approvedBy = "",
-                nextDueDate = nextDueDate.trim(),
-                createdAt = now,
-                createdBy = actor,
-                updatedAt = now,
-                updatedBy = actor
-            )
+        val entity = MaintenanceEntity(
+            crusherLine = crusherLine,
+            activityDate = activityDate,
+            activityType = activityType,
+            details = details.trim(),
+            measurements = measurements.trim(),
+            rollerCondition = rollerCondition,
+            completedBy = actor,
+            approvedBy = "",
+            nextDueDate = nextDueDate.trim(),
+            createdAt = now,
+            createdBy = actor,
+            updatedAt = now,
+            updatedBy = actor
         )
+        val insertedId = maintenanceDao.insert(entity)
         auditLogDao.insert(
             AuditLogEntity(
                 timestamp = now,
@@ -373,7 +372,7 @@ class MaintenanceRepository(
                 details = "$crusherLine — $activityType"
             )
         )
-        return Result.success(Unit)
+        return Result.success(entity.copy(id = insertedId))
     }
 
     suspend fun approveMaintenance(record: MaintenanceEntity) {

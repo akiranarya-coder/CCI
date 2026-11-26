@@ -46,6 +46,11 @@
 
     <!-- Auth & Settings -->
     <string name="sign_in">Sign In</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="auth_subtitle">Sinter Plant Coke Crushing Index &amp; Cloud Operations</string>
+    <string name="cloud_sync_title">Firebase Cloud Sync</string>
+    <string name="sync_to_cloud_now">Sync All Records to Cloud</string>
     <string name="switch_user">Switch User</string>
     <string name="backup_export">Export Local Backup (JSON)</string>
 </resources>
